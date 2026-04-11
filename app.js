@@ -1,3 +1,5 @@
+const CDN = "https://sc-proxy.apati.workers.dev";
+
 var hls = null;
 
 if (Hls.isSupported()) {
@@ -69,7 +71,7 @@ async function stream() {
     if (i == 1000) { alert("error finding last part"); return; }
     if (i == 0) i = 1;
 
-    const url = `https://d13z5uuzt1wkbz.cloudfront.net/${videoId}/HIDDEN4500-${String(i).padStart(5, "0")}.ts`;
+    const url = `${CDN}/${videoId}/HIDDEN4500-${String(i).padStart(5, "0")}.ts`;
     setStatus('Scanning — testing segment ' + i, 'active');
 
     try {
@@ -89,7 +91,7 @@ async function stream() {
 
   let data = "#EXTM3U\n#EXT-X-PLAYLIST-TYPE:VOD\n#EXT-X-TARGETDURATION:10";
   for (let i = 0; i <= last; i++) {
-    data += `#EXTINF:10,\nhttps://d13z5uuzt1wkbz.cloudfront.net/${videoId}/HIDDEN4500-${String(i).padStart(5, "0")}.ts\n`;
+    data += `#EXTINF:10,\n${CDN}/${videoId}/HIDDEN4500-${String(i).padStart(5, "0")}.ts\n`;
   }
 
   hls.loadSource("data:application/x-mpegURL;base64," + btoa(data));
@@ -122,7 +124,7 @@ async function downloadVideo() {
   let totalBytes = 0;
 
   for (let i = 0; i <= lastPartCount; i++) {
-    const url = `https://d13z5uuzt1wkbz.cloudfront.net/${lastVideoId}/HIDDEN4500-${String(i).padStart(5, "0")}.ts`;
+    const url = `${CDN}/${lastVideoId}/HIDDEN4500-${String(i).padStart(5, "0")}.ts`;
     setStatus('Downloading segment ' + (i + 1) + ' of ' + total, 'active');
     setProgress(i + 1, total);
     try {
