@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SC — Video Tool</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+
+    <header class="header">
+      <span class="header-title">SkillUncapped</span>
+      <span class="header-sub">// stream + download</span>
+    </header>
+
+    <div class="input-row">
+      <input type="text" id="url" class="url-input"
+        placeholder="https://www.skill-capped.com/valorant/browse/course/pl26vfgxpt/w7dlmzjj66"
+        onkeyup="if(event.key=='Enter') stream()"
+        autocomplete="off" spellcheck="false" />
+      <button class="btn btn-primary" onclick="stream()">Stream</button>
+      <button class="btn btn-download" id="downloadBtn" onclick="downloadVideo()">Download</button>
+    </div>
+
+    <div class="status-bar">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="status">
+        <a href="https://www.skill-capped.com/" target="_blank" rel="skill capped">
+            Paste a URL and hit Stream
+        </a>
+      </span>
+    </div>
+
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-label">
+        <span id="progressLeft"></span>
+        <span id="progressRight"></span>
+      </div>
+    </div>
+
+    <div class="video-wrap">
+      <div class="video-placeholder" id="placeholder">
+        <div class="video-placeholder-icon">
+          <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        </div>
+        <span class="video-placeholder-text">no stream loaded</span>
+      </div>
+      <video id="video" controls autoplay crossorigin="anonymous"></video>
+    </div>
+
+    <div class="meta-row" id="metaRow">
+      <div class="meta-pill" id="metaId">id <span>—</span></div>
+      <div class="meta-pill" id="metaParts">segments <span>—</span></div>
+    </div>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <script src="app.js"></script>
+</body>
+</html>
