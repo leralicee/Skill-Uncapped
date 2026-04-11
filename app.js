@@ -1,4 +1,3 @@
-// HLS init — created once on page load, reused on every stream() call (original behaviour)
 const CDN = "https://sc-proxy.apati.workers.dev";
 var hls = null;
 
@@ -9,7 +8,7 @@ if (Hls.isSupported()) {
 
 const rgx = /([a-z0-9]{10})(:?\/|$)/g;
 
-// ── URL cleaner ──────────────────────────────────────────────────────────────
+// URL cleaner
 function cleanUrl(url) {
   if (!url.toLowerCase().includes("course")) return url;
   url = url.replace(/\/$/, '');
@@ -20,7 +19,7 @@ function cleanUrl(url) {
   return cleaned;
 }
 
-// ── UI helpers ───────────────────────────────────────────────────────────────
+// UI helpers
 function setStatus(text, state) {
   document.getElementById("statusDot").className = 'status-dot' + (state ? ' ' + state : '');
   document.getElementById("status").textContent = text;
@@ -36,7 +35,7 @@ function setProgress(current, total) {
   document.getElementById("progressRight").textContent = pct + '%';
 }
 
-// ── Stream ───────────────────────────────────────────────────────────────────
+// Stream
 async function stream() {
   if (hls == null) {
     alert("hls not supported, please use a modern browser such as Chrome");
@@ -92,13 +91,11 @@ async function stream() {
     }
   }
 
-  // Build playlist — original logic preserved exactly
   let data = "#EXTM3U\n#EXT-X-PLAYLIST-TYPE:VOD\n#EXT-X-TARGETDURATION:10";
   for (let i = 0; i <= last; i++) {
     data += `#EXTINF:10,\n${CDN}/${videoId}/HIDDEN4500-${String(i).padStart(5, "0")}.ts\n`;
   }
 
-  // Original load order preserved exactly
   hls.loadSource("data:application/x-mpegURL;base64," + btoa(data));
   hls.attachMedia(video);
 
@@ -115,7 +112,7 @@ async function stream() {
   window._lastPartCount = last;
 }
 
-// ── Download ─────────────────────────────────────────────────────────────────
+// Download
 async function downloadVideo() {
   const lastVideoId = window._lastVideoId;
   const lastPartCount = window._lastPartCount;
