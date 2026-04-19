@@ -269,13 +269,13 @@ async function takeNotes() {
 
   setStatus('Generating notes...', 'active');
 
-  // 3. Send transcript to DeepSeek via Worker
+  // 3. Send transcript to Groq via Worker
   try {
     const resp = await fetch(`${CDN}/ai`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "deepseek-chat",
+        model: "llama-3.3-70b-versatile",
         stream: true,
         messages: [
           {
@@ -307,7 +307,7 @@ Be concise. Use plain language. Do not repeat yourself.`
 
     if (!resp.ok) {
       const err = await resp.text();
-      content.textContent = 'DeepSeek API error: ' + err;
+      content.textContent = 'Groq API error: ' + err;
       setStatus('API error.', 'error');
       btn.disabled = false;
       btn.textContent = 'Take Notes';
