@@ -36,20 +36,21 @@ function setProgress(current, total) {
   document.getElementById("progressRight").textContent = pct + '%';
 }
 
-// Load ffmpeg.wasm lazily (only when Take Notes is clicked)
+// Load ffmpeg.wasm (only when Take Notes is clicked)
 async function getFFmpeg() {
   if (ffmpegInstance) return ffmpegInstance;
   setStatus('Loading audio converter (first time only)...', 'active');
-  const { FFmpeg } = await import('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js');
-  const { fetchFile, toBlobURL } = await import('https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/esm/index.js');
-  const ff = new FFmpeg();
-  const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
-  await ff.load({
-    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+  await new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js';
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
   });
-  ffmpegInstance = { ff, fetchFile };
-  return ffmpegInstance;
+  const ff = FFmpeg.createFFmpeg({ log: false });
+  await ff.load();
+  ffmpegInstance = ff;
+  return ff;
 }
 
 // Stream
@@ -165,46 +166,38 @@ function parseVtt(vttText) {
 
 // Fetch N segments and convert to mp3 using ffmpeg.wasm
 async function fetchAndConvertToMp3(videoId, count) {
-  const { ff, fetchFile } = await getFFmpeg();
+  const ff = await getFFmpeg();
 
-  // Fetch and write each segment into ffmpeg's virtual filesystem
   setStatus('Fetching audio segments...', 'active');
-  const segmentNames = [];
+  const buffers = [];
   for (let i = 0; i < count; i++) {
     const url = `${CDN}/${videoId}/HIDDEN4500-${String(i).padStart(5, "0")}.ts`;
     setStatus('Fetching segment ' + (i + 1) + ' of ' + count + '...', 'active');
     try {
-      const data = await fetchFile(url);
-      const name = `seg${i}.ts`;
-      await ff.writeFile(name, data);
-      segmentNames.push(`file '${name}'`);
+      const resp = await fetch(url);
+      if (!resp.ok) continue;
+      const buf = await resp.arrayBuffer();
+      buffers.push(new Uint8Array(buf));
     } catch(e) { /* skip */ }
   }
 
-  if (segmentNames.length === 0) throw new Error('No segments could be fetched');
+  if (buffers.length === 0) throw new Error('No segments could be fetched');
 
-  // Write a concat list and run ffmpeg to extract audio as mp3
-  await ff.writeFile('concat.txt', segmentNames.join('\n'));
+  // Concatenate all segments into one file
+  const totalBytes = buffers.reduce((n, b) => n + b.length, 0);
+  const combined = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const b of buffers) { combined.set(b, offset); offset += b.length; }
+
+  ff.FS('writeFile', 'input.ts', combined);
   setStatus('Converting to audio...', 'active');
-  await ff.exec([
-    '-f', 'concat', '-safe', '0', '-i', 'concat.txt',
-    '-vn',           // drop video
-    '-ar', '16000',  // 16kHz sample rate (optimal for Whisper)
-    '-ac', '1',      // mono
-    '-b:a', '64k',   // low bitrate — we just need speech
-    'audio.mp3'
-  ]);
+  await ff.run('-i', 'input.ts', '-vn', '-ar', '16000', '-ac', '1', '-b:a', '64k', 'audio.mp3');
 
-  const mp3Data = await ff.readFile('audio.mp3');
+  const mp3Data = ff.FS('readFile', 'audio.mp3');
+  ff.FS('unlink', 'input.ts');
+  ff.FS('unlink', 'audio.mp3');
 
-  // Clean up virtual filesystem
-  for (let i = 0; i < count; i++) {
-    try { await ff.deleteFile(`seg${i}.ts`); } catch(e) {}
-  }
-  try { await ff.deleteFile('concat.txt'); } catch(e) {}
-  try { await ff.deleteFile('audio.mp3'); } catch(e) {}
-
-  return mp3Data; // Uint8Array
+  return mp3Data;
 }
 
 // Transcribe audio via Cloudflare Whisper on the Worker
