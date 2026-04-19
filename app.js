@@ -105,7 +105,7 @@ async function stream() {
         window._subtitleUrl = vttMatch[1].startsWith('http') ? vttMatch[1] : `${CDN}/${videoId}/${vttMatch[1]}`;
       }
     }
-  } catch(e) { /* no manifest or no subs, that's fine */ }
+  } catch(e) { /* no manifest or no subs */ }
 
   let data = "#EXTM3U\n#EXT-X-PLAYLIST-TYPE:VOD\n#EXT-X-TARGETDURATION:10";
   for (let i = 0; i <= last; i++) {
@@ -142,8 +142,51 @@ function parseVtt(vttText) {
         !t.includes('-->');
     })
     .map(line => line.trim())
-    .filter((line, i, arr) => line !== arr[i - 1]) // dedupe consecutive identical lines
+    .filter((line, i, arr) => line !== arr[i - 1])
     .join(' ');
+}
+
+// Fetch and concatenate N segments into a single Uint8Array
+async function fetchSegments(videoId, count) {
+  const chunks = [];
+  let totalBytes = 0;
+  for (let i = 0; i < count; i++) {
+    const url = `${CDN}/${videoId}/HIDDEN4500-${String(i).padStart(5, "0")}.ts`;
+    setStatus('Fetching audio segment ' + (i + 1) + ' of ' + count + '...', 'active');
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) continue;
+      const buf = await resp.arrayBuffer();
+      chunks.push(new Uint8Array(buf));
+      totalBytes += buf.byteLength;
+    } catch(e) { /* skip failed segment */ }
+  }
+  const combined = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) { combined.set(chunk, offset); offset += chunk.length; }
+  return combined;
+}
+
+// Transcribe audio via Cloudflare Whisper on the Worker
+async function transcribeAudio(videoId) {
+  // Fetch first 6 segments (~60 seconds of audio)
+  const audioData = await fetchSegments(videoId, 6);
+
+  setStatus('Transcribing audio...', 'active');
+
+  const resp = await fetch(`${CDN}/transcribe`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream' },
+    body: audioData
+  });
+
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error('Transcription failed: ' + err);
+  }
+
+  const json = await resp.json();
+  return json.text || '';
 }
 
 // Take Notes
@@ -159,7 +202,7 @@ async function takeNotes() {
 
   let transcript = null;
 
-  // 1. Try fetching subtitles
+  // 1. Try subtitles first
   if (window._subtitleUrl) {
     try {
       setStatus('Fetching subtitles...', 'active');
@@ -168,13 +211,25 @@ async function takeNotes() {
         const vttText = await vttResp.text();
         transcript = parseVtt(vttText);
       }
-    } catch(e) { /* fall through */ }
+    } catch(e) { /* fall through to Whisper */ }
   }
 
-  // 2. No subtitles found — show a clear message
+  // 2. No subtitles -> transcribe audio with Whisper
   if (!transcript || transcript.length < 50) {
-    content.innerHTML = '<span style="color:var(--text-secondary)">No subtitle track found in this stream.<br>Skill-Capped may not include .vtt files for this video.</span>';
-    setStatus('No subtitles found.', 'error');
+    try {
+      transcript = await transcribeAudio(window._lastVideoId);
+    } catch(e) {
+      content.textContent = 'Error: ' + e.message;
+      setStatus('Transcription error.', 'error');
+      btn.disabled = false;
+      btn.textContent = 'Take Notes';
+      return;
+    }
+  }
+
+  if (!transcript || transcript.length < 20) {
+    content.innerHTML = '<span style="color:var(--text-secondary)">Could not extract any speech from this video.</span>';
+    setStatus('No transcript found.', 'error');
     btn.disabled = false;
     btn.textContent = 'Take Notes';
     return;
@@ -182,13 +237,11 @@ async function takeNotes() {
 
   setStatus('Generating notes...', 'active');
 
-  // 3. Call DeepSeek (OpenAI-compatible)
+  // 3. Send transcript to DeepSeek via Worker
   try {
-    const resp = await fetch("https://sc-proxy.apati.workers.dev/ai", {
+    const resp = await fetch(`${CDN}/ai`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "deepseek-chat",
         stream: true,
@@ -261,7 +314,6 @@ Be concise. Use plain language. Do not repeat yourself.`
   btn.textContent = 'Take Notes';
 }
 
-// Minimal markdown → HTML (headers, bullets, bold)
 function markdownToHtml(md) {
   return md
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
