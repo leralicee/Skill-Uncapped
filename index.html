@@ -13,7 +13,7 @@
 
     <header class="header">
       <span class="header-title">SkillUncapped</span>
-      <span class="header-sub">// stream + download tool made by apati</span>
+      <span class="header-sub">-> stream + download tool</span>
     </header>
 
     <div class="input-row">
@@ -23,6 +23,7 @@
         autocomplete="off" spellcheck="false" />
       <button class="btn btn-primary" onclick="stream()">Stream</button>
       <button class="btn btn-download" id="downloadBtn" onclick="downloadVideo()">Download</button>
+      <button class="btn btn-notes" id="notesBtn" onclick="takeNotes()">Take Notes</button>
     </div>
 
     <div class="status-bar">
@@ -55,6 +56,14 @@
     <div class="meta-row" id="metaRow">
       <div class="meta-pill" id="metaId">id <span>—</span></div>
       <div class="meta-pill" id="metaParts">segments <span>—</span></div>
+    </div>
+
+    <div class="notes-panel" id="notesPanel">
+      <div class="notes-header">
+        <span class="notes-title">// ai notes</span>
+        <span class="notes-model">deepseek-chat</span>
+      </div>
+      <div class="notes-content" id="notesContent"></div>
     </div>
 
   </div>
